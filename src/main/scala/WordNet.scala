@@ -37,15 +37,19 @@ class WordNet(synsets: String, hypernyms: String){
   def distance(nounA: String, nounB: String): Int = sap(nounA, nounB).split("-").length
 
   def sap(nounA: String, nounB: String): String = {
+    val idA = Integer parseInt synsetsByName.getOrElse(nounA, throw IllegalArgumentException())
+    val idB = Integer parseInt  synsetsByName.getOrElse(nounB, throw IllegalArgumentException())
+    bfs(idA, idB).map(id => String valueOf id).mkString("-")
   }
 
-  private case class Node(queueNum: Int, id: Int, var previous: Option[Node]) extends Iterable[Int]{
+  private case class Node(queueNum: Int, id: Int, var next: Option[Node]){
     override def equals(obj: Any): Boolean = obj match {case p: Node => p.id.equals(id) case p:Any => false}
     override def hashCode(): Int = id.hashCode()
-    override def toList: List[Int] = {
+    def toList: List[Int] = {
+      @tailrec
       def walkNode(current: Node, buffer: ListBuffer[Int]): ListBuffer[Int] = {
         buffer.addOne(current.id)
-        current.previous match {
+        current.next match {
           case Some(node) => walkNode(node, buffer)
           case None => buffer
         }
@@ -61,45 +65,48 @@ class WordNet(synsets: String, hypernyms: String){
     val queueA: mutable.Queue[Node] = mutable.Queue[Node](Node(0, idA, Option.empty))
     val queueB: mutable.Queue[Node] = mutable.Queue[Node](Node(1, idB, Option.empty))
 
+    @tailrec
     def visit(toMove: Int): List[Int] = {
       val activeQueue = if(toMove % 2 == 0) queueA else queueB
       val current = activeQueue.dequeue()
 
-
-      hypernymsById(current.id)
+      val meetingNode = hypernymsById(current.id)
         .map(id => Node(toMove % 2, id, Option(current)))
-        .find()
-        )
+        .find(node => nodesById.get(node.id) match {
+          case Some(visited) => !visited.queueNum.equals(toMove % 2)
+          case None => false
+        })
 
-      if(nodesById.contains(toMove)) {
+      if(meetingNode.isDefined) {
 
-          val previous = current.previous.get
           val currentVisited = nodesById(current.id)
 
           @tailrec
           def iterateAndSwap(current: Node, next: Option[Node]): Node = {
             next match {
               case Some(node) =>
-                val next = node.previous
-                node.previous = Option(current)
+                val next = node.next
+                node.next = Option(current)
                 iterateAndSwap(node, next)
               case None => current
             }
           }
 
-          val result = iterateAndSwap(previous, Option(currentVisited)).toList
-      }else{
+          iterateAndSwap(current, Option(currentVisited)).toList
+      }
+      else{
         hypernymsById(current.id)
           .map(id => Node(toMove % 2, id, Option(current)))
-          .filter(node => nodesById.contains(cu))
-        activeQueue.enqueue()
+          .filter(node => nodesById.get(node.id) match {
+            case Some(visited) => visited.queueNum.equals(toMove % 2)
+            case None => false
+          })
+          .foreach(node => nodesById.put(node.id, node))
+        visit(toMove + 1)
       }
 
-
     }
-
-
-
+    visit(0)
 
   }
 
