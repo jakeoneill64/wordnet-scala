@@ -5,7 +5,6 @@ object Testing extends App {
   "https://coursera.cs.princeton.edu/algs4/assignments/wordnet/files/hypernyms.txt"
   )
 
-  println("hello world")
 
 
 }
