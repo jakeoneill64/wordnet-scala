@@ -11,11 +11,10 @@ class WordNet(synsets: String, hypernyms: String){
   private def downloadLines(file: String): Iterator[String] =
     CollectionConverters.asScala(new BufferedReader(new InputStreamReader(new URL(file).openStream())).lines().iterator())
 
-  val synsetsByName = downloadLines(synsets)
-    .flatMap { line =>
+  val idsBySynset: Map[String, Int] = downloadLines(synsets)
+    .map { line =>
       val row = line split ","
-      val nouns = row(1) split "\\s+"
-      nouns map { noun => (noun, row(0)) }
+      (row(1), Integer parseInt row(0))
     }
     .toMap
 
@@ -27,18 +26,18 @@ class WordNet(synsets: String, hypernyms: String){
   .toMap
 
   def nouns(): Iterable[String] = {
-    synsetsByName.keys
+    idsBySynset.keys
   }
 
   def isNoun(word: String): Boolean = {
-    synsetsByName.contains(word)
+    idsBySynset.contains(word)
   }
 
   def distance(nounA: String, nounB: String): Int = sap(nounA, nounB).split("-").length
 
   def sap(nounA: String, nounB: String): String = {
-    val idA = Integer parseInt synsetsByName.getOrElse(nounA, throw IllegalArgumentException())
-    val idB = Integer parseInt  synsetsByName.getOrElse(nounB, throw IllegalArgumentException())
+    val idA = idsBySynset.getOrElse(nounA, throw IllegalArgumentException())
+    val idB = idsBySynset.getOrElse(nounB, throw IllegalArgumentException())
     bfs(idA, idB).map(id => String valueOf id).mkString("-")
   }
 
@@ -46,6 +45,7 @@ class WordNet(synsets: String, hypernyms: String){
     override def equals(obj: Any): Boolean = obj match {case p: Node => p.id.equals(id) case p:Any => false}
     override def hashCode(): Int = id.hashCode()
     def toList: List[Int] = {
+
       @tailrec
       def walkNode(current: Node, buffer: ListBuffer[Int]): ListBuffer[Int] = {
         buffer.addOne(current.id)
@@ -56,20 +56,35 @@ class WordNet(synsets: String, hypernyms: String){
       }
       walkNode(this, ListBuffer()).toList
     }
+
+    def joinList(head: Option[Node]): Node = {
+      next match {
+        case Some(node) =>
+          val next = node.next
+          node.next = Option(this)
+          joinList(head)
+        case None => this
+      }
+    }
+
   }
 
   def bfs(idA: Int, idB: Int): List[Int] = {
 
-    val nodesById: mutable.Map[Int, Node] = mutable.Map[Int, Node]()
+    val nodeA = Node(0, idA, Option.empty)
+    val nodeB = Node(1, idB, Option.empty)
 
-    val queueA: mutable.Queue[Node] = mutable.Queue[Node](Node(0, idA, Option.empty))
-    val queueB: mutable.Queue[Node] = mutable.Queue[Node](Node(1, idB, Option.empty))
+    val nodesById: mutable.Map[Int, Node] = mutable.Map[Int, Node](nodeA.id -> nodeA, nodeB.id -> nodeB)
+
+    val queueA: mutable.Queue[Node] = mutable.Queue[Node](nodeA)
+    val queueB: mutable.Queue[Node] = mutable.Queue[Node](nodeB)
 
     @tailrec
     def visit(toMove: Int): List[Int] = {
       val activeQueue = if(toMove % 2 == 0) queueA else queueB
       val current = activeQueue.dequeue()
 
+      //check if we have found a path
       val meetingNode = hypernymsById(current.id)
         .map(id => Node(toMove % 2, id, Option(current)))
         .find(node => nodesById.get(node.id) match {
@@ -79,29 +94,25 @@ class WordNet(synsets: String, hypernyms: String){
 
       if(meetingNode.isDefined) {
 
-          val currentVisited = nodesById(current.id)
+          val currentVisited = nodesById.get(current.id)
 
-          @tailrec
-          def iterateAndSwap(current: Node, next: Option[Node]): Node = {
-            next match {
-              case Some(node) =>
-                val next = node.next
-                node.next = Option(current)
-                iterateAndSwap(node, next)
-              case None => current
-            }
-          }
-
-          iterateAndSwap(current, Option(currentVisited)).toList
+          current.joinList(currentVisited).toList
       }
       else{
+
+        //add the hypernyms to be visited
         hypernymsById(current.id)
           .map(id => Node(toMove % 2, id, Option(current)))
           .filter(node => nodesById.get(node.id) match {
-            case Some(visited) => visited.queueNum.equals(toMove % 2)
-            case None => false
+            case Some(visited) => false // must have been visited b
+            case None => true
           })
-          .foreach(node => nodesById.put(node.id, node))
+          .foreach(node => {
+            nodesById.put(node.id, node)
+            activeQueue.enqueue(node)
+          }
+          )
+
         visit(toMove + 1)
       }
 
