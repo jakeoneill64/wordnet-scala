@@ -44,25 +44,23 @@ class WordNet(synsets: String, hypernyms: String){
   private case class Node(queueNum: Int, id: Int, var next: Option[Node]){
     override def equals(obj: Any): Boolean = obj match {case p: Node => p.id.equals(id) case p:Any => false}
     override def hashCode(): Int = id.hashCode()
-    def toList: List[Int] = {
-
-      @tailrec
-      def walkNode(current: Node, buffer: ListBuffer[Int]): ListBuffer[Int] = {
-        buffer.addOne(current.id)
-        current.next match {
-          case Some(node) => walkNode(node, buffer)
-          case None => buffer
-        }
+    def walkNode(current: Node, buffer: ListBuffer[Int]): ListBuffer[Int] = {
+      buffer.addOne(current.id)
+      current.next match {
+        case Some(node) => walkNode(node, buffer)
+        case None => buffer
       }
+    }
+    def toList: List[Int] = {
       walkNode(this, ListBuffer()).toList
     }
 
     def joinList(head: Option[Node]): Node = {
-      next match {
+      head match {
         case Some(node) =>
           val next = node.next
           node.next = Option(this)
-          joinList(head)
+          joinList(next)
         case None => this
       }
     }
@@ -79,24 +77,24 @@ class WordNet(synsets: String, hypernyms: String){
     val queueA: mutable.Queue[Node] = mutable.Queue[Node](nodeA)
     val queueB: mutable.Queue[Node] = mutable.Queue[Node](nodeB)
 
-    @tailrec
     def visit(toMove: Int): List[Int] = {
       val activeQueue = if(toMove % 2 == 0) queueA else queueB
+      if(activeQueue.isEmpty) return visit(toMove +1)
       val current = activeQueue.dequeue()
 
       //check if we have found a path
       val meetingNode = hypernymsById(current.id)
         .map(id => Node(toMove % 2, id, Option(current)))
         .find(node => nodesById.get(node.id) match {
-          case Some(visited) => !visited.queueNum.equals(toMove % 2)
+          case Some(visited) => visited.queueNum.equals(toMove % 2)
           case None => false
         })
 
       if(meetingNode.isDefined) {
 
           val currentVisited = nodesById.get(current.id)
+          current.joinList(meetingNode).toList
 
-          current.joinList(currentVisited).toList
       }
       else{
 
