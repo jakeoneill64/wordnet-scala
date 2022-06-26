@@ -39,18 +39,39 @@ class WordNet(synsets: String, hypernyms: String){
     idsByNoun contains word
   }
 
-  def distance(nounA: String, nounB: String): Int = sap(nounA, nounB).split("-").length
+  def distance(nounA: String, nounB: String): Int = sap(nounA, nounB).split("-").length - 1
 
-  def sap(nounA: String, nounB: String): String = {
-    val idA = idsByNoun.getOrElse(nounA, throw IllegalArgumentException())
-    val idB = idsByNoun.getOrElse(nounB, throw IllegalArgumentException())
-    bfs(idA, idB).map(id => String valueOf id).mkString("-")
+  def sap(nounA: String, nounB: String): String = bfs(nounA, nounB).map(id => String valueOf id).mkString("-")
+
+  case class Node(id: Int, noun: String, next: Option[Node]){
+
+    val thisNode: Node = this
+
+    override def equals(obj: Any): Boolean = obj match {
+      case node: Node => node.id.equals(id)
+    }
+
+    def toList: List[Node] = {
+      new Iterator[Node]{
+        private var current: Option[Node] = Option(thisNode)
+        override def next(): Node = {
+          val old = current.get
+          current = current.get.next
+          old
+        }
+        override def hasNext: Boolean = current.isDefined
+      }.toList
+    }
+
   }
 
+  def bfs(nounA: String, nounB: String): List[Int] = {
+    val idsA = idsByNoun.getOrElse(nounA, throw IllegalArgumentException())
+    val idsB = idsByNoun.getOrElse(nounB, throw IllegalArgumentException())
 
-  def bfs(idA: List[Int], idB: List[Int]): List[Int] = {
+  }
 
-
+  def bfs_() = {
 
   }
 
