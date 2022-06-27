@@ -82,7 +82,7 @@ class WordNet(synsets: String, hypernyms: String){
 
   }
 
-  def search(nounA: String, nounB: String): List[Int] = {
+  private def search(nounA: String, nounB: String): List[Int] = {
 
     val nounToNodes = (noun: String) => idsByNoun
       .getOrElse(noun, throw IllegalArgumentException())
@@ -97,10 +97,10 @@ class WordNet(synsets: String, hypernyms: String){
     startNodesA.foreach(node => queueA.enqueue(node))
     startNodesB.foreach(node => queueB.enqueue(node))
 
-    bfs_(queueA, queueB, mutable.Map[Int, Node](), 0).toList.map {node => node.id}
+    bfs(queueA, queueB, mutable.Map[Int, Node](), 0).toList.map {node => node.id}
   }
 
-  def bfs_(queueA: mutable.Queue[Node], queueB:mutable.Queue[Node], visitedById: mutable.Map[Int, Node], toMove: Int): Node = {
+  private def bfs(queueA: mutable.Queue[Node], queueB:mutable.Queue[Node], visitedById: mutable.Map[Int, Node], toMove: Int): Node = {
 
     val activeQueue = {
       val either = if (toMove % 2 == 0) queueA else queueB
