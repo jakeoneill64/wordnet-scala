@@ -85,7 +85,7 @@ class WordNet(synsets: String, hypernyms: String){
   def search(nounA: String, nounB: String): List[Int] = {
 
     val nounToNodes = (noun: String) => idsByNoun
-      .getOrElse(nounA, throw IllegalArgumentException())
+      .getOrElse(noun, throw IllegalArgumentException())
       .map {id => Node(id, noun, Option.empty)}
 
     val startNodesA = nounToNodes(nounA)
@@ -102,18 +102,29 @@ class WordNet(synsets: String, hypernyms: String){
 
   def bfs_(queueA: mutable.Queue[Node], queueB:mutable.Queue[Node], visitedById: mutable.Map[Int, Node], toMove: Int): Node = {
 
-    val activeQueue = if(toMove % 2 == 0 && queueA.nonEmpty) queueA else queueB
+    val activeQueue = {
+      val either = if (toMove % 2 == 0) queueA else queueB
+      val other = if (toMove % 2 == 1) queueA else queueB
+      if(either.nonEmpty) either else other
+    }
 
     val current = activeQueue.dequeue()
 
     val alreadyVisited = visitedById.get(current.id)
 
     if(alreadyVisited.isDefined) {
-      current.join(alreadyVisited.get)
+
+      if(alreadyVisited.get.noun.equals(current.noun))
+        bfs_(queueA, queueB, visitedById, toMove+1)
+      else
+        current.next.get.join(alreadyVisited.get)
+
     } else{
+
       hypernymsById(current.id).map{id => Node(id, current.noun, Option(current))}.foreach{node => activeQueue.enqueue(node)}
       visitedById.put(current.id, current)
       bfs_(queueA, queueB, visitedById, toMove + 1)
+
     }
 
 
