@@ -41,37 +41,82 @@ class WordNet(synsets: String, hypernyms: String){
 
   def distance(nounA: String, nounB: String): Int = sap(nounA, nounB).split("-").length - 1
 
-  def sap(nounA: String, nounB: String): String = bfs(nounA, nounB).map(id => String valueOf id).mkString("-")
+  def sap(nounA: String, nounB: String): String = search(nounA, nounB).map(id => String valueOf id).mkString("-")
 
-  case class Node(id: Int, noun: String, next: Option[Node]){
+  case class Node(id: Int, noun: String, var next: Option[Node]){
 
     val thisNode: Node = this
 
-    override def equals(obj: Any): Boolean = obj match {
-      case node: Node => node.id.equals(id)
+    @tailrec
+    private def step(current: Node, next: Node): Node = {
+      val tmp = next.next
+      next.next = Option(current)
+      if(tmp.isDefined)
+        step(next, tmp.get)
+      else
+        next
     }
 
+
+    def join(node: Node): Node = {
+      step(this, node)
+    }
+
+
     def toList: List[Node] = {
+
       new Iterator[Node]{
         private var current: Option[Node] = Option(thisNode)
+
         override def next(): Node = {
           val old = current.get
           current = current.get.next
           old
         }
+
         override def hasNext: Boolean = current.isDefined
+
       }.toList
+
     }
 
   }
 
-  def bfs(nounA: String, nounB: String): List[Int] = {
-    val idsA = idsByNoun.getOrElse(nounA, throw IllegalArgumentException())
-    val idsB = idsByNoun.getOrElse(nounB, throw IllegalArgumentException())
+  def search(nounA: String, nounB: String): List[Int] = {
 
+    val nounToNodes = (noun: String) => idsByNoun
+      .getOrElse(nounA, throw IllegalArgumentException())
+      .map {id => Node(id, noun, Option.empty)}
+
+    val startNodesA = nounToNodes(nounA)
+    val startNodesB = nounToNodes(nounB)
+
+    val queueA = mutable.Queue[Node]()
+    val queueB = mutable.Queue[Node]()
+
+    startNodesA.foreach(node => queueA.enqueue(node))
+    startNodesB.foreach(node => queueB.enqueue(node))
+
+    bfs_(queueA, queueB, mutable.Map[Int, Node](), 0).toList.map {node => node.id}
   }
 
-  def bfs_() = {
+  def bfs_(queueA: mutable.Queue[Node], queueB:mutable.Queue[Node], visitedById: mutable.Map[Int, Node], toMove: Int): Node = {
+
+    val activeQueue = if(toMove % 2 == 0 && queueA.nonEmpty) queueA else queueB
+
+    val current = activeQueue.dequeue()
+
+    val alreadyVisited = visitedById.get(current.id)
+
+    if(alreadyVisited.isDefined) {
+      current.join(alreadyVisited.get)
+    } else{
+      hypernymsById(current.id).map{id => Node(id, current.noun, Option(current))}.foreach{node => activeQueue.enqueue(node)}
+      visitedById.put(current.id, current)
+      bfs_(queueA, queueB, visitedById, toMove + 1)
+    }
+
+
 
   }
 
