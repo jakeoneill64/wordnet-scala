@@ -100,6 +100,7 @@ class WordNet(synsets: String, hypernyms: String){
     bfs(queueA, queueB, mutable.Map[Int, Node](), 0).toList.map {node => node.id}
   }
 
+  @tailrec
   private def bfs(queueA: mutable.Queue[Node], queueB:mutable.Queue[Node], visitedById: mutable.Map[Int, Node], toMove: Int): Node = {
 
     val activeQueue = {
@@ -115,7 +116,7 @@ class WordNet(synsets: String, hypernyms: String){
     if(alreadyVisited.isDefined) {
 
       if(alreadyVisited.get.noun.equals(current.noun))
-        bfs_(queueA, queueB, visitedById, toMove+1)
+        bfs(queueA, queueB, visitedById, toMove+1)
       else
         current.next.get.join(alreadyVisited.get)
 
@@ -123,7 +124,7 @@ class WordNet(synsets: String, hypernyms: String){
 
       hypernymsById(current.id).map{id => Node(id, current.noun, Option(current))}.foreach{node => activeQueue.enqueue(node)}
       visitedById.put(current.id, current)
-      bfs_(queueA, queueB, visitedById, toMove + 1)
+      bfs(queueA, queueB, visitedById, toMove + 1)
 
     }
 
